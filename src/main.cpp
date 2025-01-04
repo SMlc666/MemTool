@@ -17,6 +17,9 @@ int main(int argc, char **argv) {
   std::cout << "mem[1] = " << mem[1] << std::endl;
   std::cout << "mem[2] = " << mem[2] << std::endl;
   std::cout << "mem[3] = " << mem[3] << std::endl;
+  std::cout << "memMap" << MemTool::Native::getAddressMap(mem).getPathName()
+            << std::endl;
+
   std::vector<MemTool::Native::Map> maps = MemTool::Native::parseAllMaps();
   for (auto &map : maps) {
     std::cout << map.getPathName() << std::endl;

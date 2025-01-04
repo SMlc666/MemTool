@@ -14,6 +14,11 @@
 static const long pageSize = sysconf(_SC_PAGESIZE);
 namespace MemTool {
 namespace Native {
+// 解析perms字符串，生成PROT_xxx的组合
+// 参数:
+//   perms: 权限字符串，如"rwx"
+// 返回值:
+//   PROT_xxx的组合
 inline int parsePermsToProt(const std::string &perms) {
   int prot = PROT_NONE;
   if (perms.length() < 1) {
@@ -48,6 +53,14 @@ public:
   [[nodiscard]] inline bool isVaild() const {
     return (startAddress == nullptr) && (endAddress == nullptr) && (size == 0U);
   }
+  template <typename T> inline bool isContains(const T address) const {
+    static_assert(std::is_integral_v<T> || std::is_pointer_v<T>,
+                  "T must be integral or pointer");
+    auto m_address = reinterpret_cast<uintptr_t>(address);
+    auto m_startAddress = reinterpret_cast<uintptr_t>(startAddress);
+    auto m_endAddress = reinterpret_cast<uintptr_t>(endAddress);
+    return m_address >= m_startAddress && m_address < m_endAddress;
+  }
 
 private:
   void *startAddress;
@@ -56,6 +69,11 @@ private:
   int protection;
   std::string pathName;
 };
+// 解析/proc/self/maps中的一行，生成一个Map对象
+// 参数:
+//   line: /proc/self/maps中的一行
+// 返回值:
+//   生成的Map对象
 inline Map parseMapByLine(const std::string &line) {
   std::istringstream iss(line);
   Map map{};
@@ -76,6 +94,11 @@ inline Map parseMapByLine(const std::string &line) {
             end - start, protect, path);
   return map;
 }
+// 获取指定名称的内存映射
+// 参数:
+//   name: 内存映射的名称
+// 返回值:
+//   成功返回true，失败返回false
 inline bool parseMapByName(const std::string &name, Map &map) {
   std::ifstream file("/proc/self/maps");
   if (!file.is_open()) {
@@ -91,6 +114,9 @@ inline bool parseMapByName(const std::string &name, Map &map) {
   }
   return false;
 }
+// 获取系统中所有的内存映射
+// 返回值:
+//   系统中所有的内存映射
 inline std::vector<Map> parseAllMaps() {
   std::ifstream file("/proc/self/maps");
   if (!file.is_open()) {
@@ -106,6 +132,20 @@ inline std::vector<Map> parseAllMaps() {
     maps.push_back(map);
   }
   return maps;
+}
+// 获取指定地址所在的内存映射
+// 参数:
+//   address: 内存地址
+// 返回值:
+//   所在内存映射的Map对象
+inline Map getAddressMap(const void *address) {
+  std::vector<Map> maps = parseAllMaps();
+  for (const auto &map : maps) {
+    if (map.isContains(address)) {
+      return map;
+    }
+  }
+  return {};
 }
 // 获取系统页大小
 // 返回值:
@@ -236,11 +276,28 @@ template <typename T, typename U> inline void write(T address, const U value) {
 } // namespace Wrapper
 namespace Safe {
 template <typename T>
-inline void read(const T address, void *buffer, size_t size) {
+inline bool read(const T address, void *buffer, size_t size) {
   void *m_address = reinterpret_cast<void *>(address);
   if (m_address == nullptr || buffer == nullptr || size == 0) {
-    return;
+    return false;
   }
+  Native::Map map = Native::getAddressMap(m_address);
+  if (map.isVaild()) {
+    return false;
+  }
+  int protection = map.getProtection();
+  if (Native::setProtection(m_address, size, PROT_READ) == -1) {
+    return false;
+  }
+  Native::read(m_address, buffer, size);
+  Native::setProtection(m_address, size, protection);
+}
+template <typename T, typename U> inline U read(const T address) {
+  U value;
+  if (!read(address, &value, sizeof(U))) {
+    return {};
+  }
+  return value;
 }
 } // namespace Safe
 } // namespace MemTool
