@@ -275,6 +275,13 @@ template <typename T, typename U> inline void write(T address, const U value) {
 }
 } // namespace Wrapper
 namespace Safe {
+// 安全地从指定内存区域读取数据到缓冲区
+// 参数:
+//   address: 内存区域的起始地址
+//   buffer: 用于存储读取数据的缓冲区
+//   size: 需要读取的数据大小
+// 返回值:
+//   成功返回true，失败返回false
 template <typename T>
 inline bool read(const T address, void *buffer, size_t size) {
   void *m_address = reinterpret_cast<void *>(address);
@@ -292,6 +299,11 @@ inline bool read(const T address, void *buffer, size_t size) {
   Native::read(m_address, buffer, size);
   Native::setProtection(m_address, size, protection);
 }
+// 安全地从指定内存区域读取数据到返回
+// 参数:
+//   address: 内存区域的起始地址
+// 返回值:
+//   成功返回读取的数据，失败返回空值
 template <typename T, typename U> inline U read(const T address) {
   U value;
   if (!read(address, &value, sizeof(U))) {
