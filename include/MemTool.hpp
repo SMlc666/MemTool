@@ -70,6 +70,18 @@ private:
   int protection;
   std::string pathName;
 };
+// 获取当前进程的名称
+// 返回值:
+//   当前进程的名称
+inline std::string getProcessName() {
+  std::ifstream file("/proc/self/cmdline");
+  if (!file.is_open()) {
+    return {};
+  }
+  std::string line;
+  std::getline(file, line);
+  return line;
+}
 // 解析/proc/self/maps中的一行，生成一个Map对象
 // 参数:
 //   line: /proc/self/maps中的一行
